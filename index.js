@@ -13,7 +13,6 @@ app.listen(PORT, () => {
 // --- WhatsApp Bot Code Starts Here ---
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
-const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 
 const usersFile = './users.json';
@@ -29,14 +28,25 @@ async function connectToWhatsApp() {
         printQRInTerminal: false
     });
 
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update;
-        
-        if (qr) {
-            console.log('📱 Neeche diye gaye QR Code ko apne WhatsApp se scan karein:\n');
-            qrcode.generate(qr, { small: true });
-        }
+    // Aapka number yahan set kar diya gaya hai
+    const phoneNumber = '923400480853'; 
 
+    if (!sock.authState.creds.registered) {
+        setTimeout(async () => {
+            try {
+                let code = await sock.requestPairingCode(phoneNumber.trim());
+                code = code?.match(/.{1,4}/g)?.join('-') || code;
+                console.log(`\n🔑 Aapka 8-digit Pairing Code yeh hai: \x1b[32m${code}\x1b[0m\n`);
+                console.log('Apne WhatsApp par jayein -> Linked Devices -> Link with phone number instead -> Yeh code enter karein.');
+            } catch (error) {
+                console.log('Pairing code lene me error aaya:', error);
+            }
+        }, 3000);
+    }
+
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect } = update;
+        
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error = new Boom(lastDisconnect?.error))?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('Connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
